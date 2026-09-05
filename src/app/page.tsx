@@ -1,2 +1,2 @@
-import AffordabilityApp from '@/components/AffordabilityApp';
-export default function Page(){ return <AffordabilityApp/>; }
+import AffordabilityAppV2 from '@/components/AffordabilityAppV2';
+export default function Page(){ return <AffordabilityAppV2/>; }
