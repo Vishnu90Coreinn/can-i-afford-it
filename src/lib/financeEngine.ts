@@ -22,6 +22,23 @@ export interface FinanceResult {
   ownership?:{totalOwnershipCost:number;costPerMonth:number|null;costPerUse:number|null};
 }
 
+export interface CashWaitPlan {
+  monthlySaving:number;
+  fundingGapWithoutEmergency:number;
+  reservePreservationGap:number;
+  monthsToFundWithoutEmergency:number|null;
+  monthsToPreserveTarget:number|null;
+  earliestViableMonth:number|null;
+  availableSavingsAtViableMonth:number|null;
+}
+
+export interface StressResult {
+  monthlyBurn:number;
+  runwayMonths:number|null;
+  interruptionMonths:number;
+  liquidRemaining:number;
+}
+
 const finite=(n:number)=>Number.isFinite(n);
 const nonNegative=(n:number)=>finite(n)&&n>=0;
 const safeDiv=(a:number,b:number)=>b>0&&finite(a)&&finite(b)?a/b:null;
@@ -36,7 +53,7 @@ export function calculateEmi(principal:number,apr:number,months:number){
 
 export function validateScenario(s:Scenario){
   const errors:string[]=[];
-  const fields:[string,number|undefined][]=[['Purchase price',s.purchasePrice],['Take-home income',s.monthlyTakeHome],['Essentials',s.essentials],['Debt payments',s.debtPayments],['Planned monthly saving',s.plannedMonthlySaving],['Emergency savings',s.emergencySavings],['Available savings',s.availableSavings],['Down payment',s.downPayment],['Upfront fees',s.upfrontFees],['Financed fees',s.financedFees],['APR',s.apr],['Monthly purchase saving',s.monthlyPurchaseSaving]];
+  const fields:[string,number|undefined][]=[['Purchase price',s.purchasePrice],['Take-home income',s.monthlyTakeHome],['Essentials',s.essentials],['Debt payments',s.debtPayments],['Planned monthly saving',s.plannedMonthlySaving],['Emergency savings',s.emergencySavings],['Available savings',s.availableSavings],['Down payment',s.downPayment],['Upfront fees',s.upfrontFees],['Financed fees',s.financedFees],['APR',s.apr],['Monthly purchase saving',s.monthlyPurchaseSaving],['Emergency-mode expenses',s.emergencyModeExpenses],['Accessories',s.accessories],['Maintenance',s.maintenance],['Recurring ownership costs',s.recurringOwnershipCosts],['Expected resale value',s.expectedResaleValue],['Uses per week',s.usesPerWeek]];
   for(const [name,value] of fields) if(value!==undefined&&!nonNegative(value)) errors.push(`${name} must be zero or greater.`);
   if(!finite(s.purchasePrice)||s.purchasePrice<=0) errors.push('Purchase price must be greater than zero.');
   if(s.reserveTargetMonths<1||s.reserveTargetMonths>18) errors.push('Reserve target must be between 1 and 18 months.');
@@ -106,4 +123,27 @@ export function calculateScenario(s:Scenario):FinanceResult {
     result.ownership={totalOwnershipCost,costPerMonth:s.ownershipMonths>0?totalOwnershipCost/s.ownershipMonths:null,costPerUse:uses>0?totalOwnershipCost/uses:null};
   }
   return result;
+}
+
+export function calculateCashWaitPlan(s:Scenario):CashWaitPlan {
+  const monthlySaving=Math.max(0,s.monthlyPurchaseSaving);
+  const core=s.essentials+s.debtPayments;
+  const requiredReserve=s.reserveTargetMonths*core;
+  const totalLiquid=s.availableSavings+s.emergencySavings;
+  const fundingGapWithoutEmergency=Math.max(0,s.purchasePrice-s.availableSavings);
+  const reservePreservationGap=Math.max(0,s.purchasePrice+requiredReserve-totalLiquid);
+  const months=(gap:number)=>gap===0?0:monthlySaving>0?Math.ceil(gap/monthlySaving):null;
+  const monthsToFundWithoutEmergency=months(fundingGapWithoutEmergency);
+  const monthsToPreserveTarget=months(reservePreservationGap);
+  const earliestViableMonth=monthsToFundWithoutEmergency===null||monthsToPreserveTarget===null?null:Math.max(monthsToFundWithoutEmergency,monthsToPreserveTarget);
+  return {
+    monthlySaving,fundingGapWithoutEmergency,reservePreservationGap,monthsToFundWithoutEmergency,monthsToPreserveTarget,earliestViableMonth,
+    availableSavingsAtViableMonth:earliestViableMonth===null?null:s.availableSavings+monthlySaving*earliestViableMonth
+  };
+}
+
+export function calculateStressScenario(result:FinanceResult,emergencyModeExpenses:number,debtPayments:number,interruptionMonths:number):StressResult {
+  const monthlyBurn=Math.max(0,emergencyModeExpenses)+Math.max(0,debtPayments)+Math.max(0,result.newEmi);
+  const months=Math.max(0,interruptionMonths);
+  return {monthlyBurn,runwayMonths:safeDiv(result.liquidAfter,monthlyBurn),interruptionMonths:months,liquidRemaining:Math.max(0,result.liquidAfter-monthlyBurn*months)};
 }
