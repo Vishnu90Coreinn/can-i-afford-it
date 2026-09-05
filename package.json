@@ -1,6 +1,14 @@
 {
-  "name":"can-i-afford-it","version":"1.0.0","private":true,
-  "scripts":{"dev":"next dev","build":"next build","start":"next start"},
+  "name":"can-i-afford-it",
+  "version":"1.0.0",
+  "private":true,
+  "scripts":{
+    "dev":"next dev",
+    "build":"next build",
+    "start":"next start",
+    "test":"tsx --test tests/financeEngine.test.ts",
+    "check":"npm run test && npm run build"
+  },
   "dependencies":{"next":"16.0.10","react":"19.2.3","react-dom":"19.2.3"},
-  "devDependencies":{"@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","typescript":"^5.7.0"}
+  "devDependencies":{"@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","typescript":"^5.7.0","tsx":"^4.20.0"}
 }
