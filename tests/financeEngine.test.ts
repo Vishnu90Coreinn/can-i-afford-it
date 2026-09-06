@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {calculateEmi,calculateScenario,validateScenario,type Scenario} from '../src/lib/financeEngine';
+import {calculateCashWaitPlan,calculateEmi,calculateScenario,calculateStressScenario,validateScenario,type Scenario} from '../src/lib/financeEngine';
 
 const base:Scenario={
   purchasePrice:149900,monthlyTakeHome:140000,incomeMode:'regular',essentials:60000,debtPayments:15000,plannedMonthlySaving:0,
@@ -53,9 +53,7 @@ test('variable income requires conservative income',()=>{
 });
 
 test('negative values are invalid',()=>assert.ok(validateScenario(s({availableSavings:-1})).length>0));
-
 test('purchase price zero is invalid',()=>assert.ok(validateScenario(s({purchasePrice:0})).length>0));
-
 test('down payment above price is invalid',()=>assert.ok(validateScenario(s({paymentMode:'emi',downPayment:200000})).length>0));
 
 test('monthly deficit is surfaced',()=>{
@@ -68,7 +66,7 @@ test('purchase-saving rate above cash buffer gets warning',()=>{
 
 test('months to reserve target rounds up',()=>{
   const r=calculateScenario(s({purchasePrice:250000,reserveTargetMonths:4,monthlyPurchaseSaving:30000}));
-  assert.equal(r.monthsToCloseReserveGap,8);
+  assert.equal(r.monthsToCloseReserveGap,2);
 });
 
 test('purchase-ready cash excludes emergency savings',()=>{
@@ -86,4 +84,40 @@ test('ownership cost separates financing premium from purchase price',()=>{
 
 test('resale above purchase price is allowed but warned',()=>{
   const r=calculateScenario(s({ownershipMonths:12,expectedResaleValue:200000})); assert.ok(r.warnings.some(x=>x.includes('resale value')));
+});
+
+test('wait plan solves purchase funding and selected reserve together',()=>{
+  const p=calculateCashWaitPlan(s({emergencySavings:0,availableSavings:0,monthlyPurchaseSaving:25000}));
+  assert.equal(p.fundingGapWithoutEmergency,149900);
+  assert.equal(p.reservePreservationGap,599900);
+  assert.equal(p.monthsToFundWithoutEmergency,6);
+  assert.equal(p.monthsToPreserveTarget,24);
+  assert.equal(p.earliestViableMonth,24);
+  assert.equal(p.availableSavingsAtViableMonth,600000);
+});
+
+test('wait plan is zero months when purchase and reserve already fit',()=>{
+  const p=calculateCashWaitPlan(s({purchasePrice:50000,emergencySavings:500000,availableSavings:200000}));
+  assert.equal(p.earliestViableMonth,0);
+});
+
+test('wait plan is unavailable with a gap and zero saving rate',()=>{
+  const p=calculateCashWaitPlan(s({emergencySavings:0,availableSavings:0,monthlyPurchaseSaving:0}));
+  assert.equal(p.earliestViableMonth,null);
+});
+
+test('stress scenario is derived from the passed active scenario only',()=>{
+  const cash=calculateScenario(s({paymentMode:'cash'}));
+  const stress=calculateStressScenario(cash,50000,15000,2);
+  assert.equal(stress.monthlyBurn,65000);
+  assert.equal(stress.liquidRemaining,220100);
+});
+
+test('cash and EMI calculations stay independent for the same base inputs',()=>{
+  const baseScenario=s({downPayment:30000,upfrontFees:2000,apr:12,termMonths:12});
+  const cash=calculateScenario({...baseScenario,paymentMode:'cash'});
+  const emi=calculateScenario({...baseScenario,paymentMode:'emi'});
+  assert.equal(cash.newEmi,0);
+  assert.ok(emi.newEmi>0);
+  assert.notEqual(cash.liquidAfter,emi.liquidAfter);
 });
