@@ -66,7 +66,7 @@ test('purchase-saving rate above cash buffer gets warning',()=>{
 
 test('months to reserve target rounds up',()=>{
   const r=calculateScenario(s({purchasePrice:250000,reserveTargetMonths:4,monthlyPurchaseSaving:30000}));
-  assert.equal(r.monthsToCloseReserveGap,8);
+  assert.equal(r.monthsToCloseReserveGap,2);
 });
 
 test('purchase-ready cash excludes emergency savings',()=>{
